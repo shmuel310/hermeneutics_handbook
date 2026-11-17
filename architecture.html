@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數位詮釋學體系 v3.0：自主多代理編排與金標升級引擎</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@400;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-paper: #F9F6F0;
+            --text-ink: #2C2C2C;
+            --accent-crimson: #8C3A3A;
+            --accent-green: #4A5D4E;
+            --accent-gold: #B8860B;
+            --border-light: #E2DCD0;
+            --code-bg: #21252B;
+        }
+
+        body {
+            background-color: var(--bg-paper);
+            color: var(--text-ink);
+            font-family: 'Noto Serif TC', serif;
+            line-height: 1.95;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4, .font-display {
+            font-family: 'Playfair Display', 'Noto Serif TC', serif;
+        }
+
+        .font-sans {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+        }
+        
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-paper);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D1C9B8;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #B8B09F;
+        }
+
+        /* Annotation Tooltip */
+        .annotation-trigger {
+            cursor: pointer;
+            border-bottom: 2px dashed var(--accent-crimson);
+            color: var(--text-ink);
+            font-weight: 600;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .annotation-trigger:hover {
+            color: var(--accent-crimson);
+            background-color: rgba(140, 58, 58, 0.06);
+        }
+
+        #global-tooltip {
+            position: absolute;
+            background-color: #ffffff;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            width: max-content;
+            max-width: 340px;
+            z-index: 50;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(8px);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+            font-family: 'Noto Sans TC', sans-serif;
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+
+        #global-tooltip.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        /* Cards & Visual Containers */
+        .quote-box {
+            border-left: 4px solid var(--accent-crimson);
+            background: linear-gradient(to right, rgba(140,58,58,0.05), transparent);
+        }
+
+        .gold-box {
+            border-left: 4px solid var(--accent-gold);
+            background: linear-gradient(to right, rgba(184,134,11,0.06), transparent);
+        }
+
+        .step-list-item {
+            position: relative;
+            padding-left: 3rem;
+        }
+        
+        .step-list-item::before {
+            content: attr(data-step);
+            position: absolute;
+            left: 0;
+            top: 0.25rem;
+            width: 2rem;
+            height: 2rem;
+            background-color: var(--accent-green);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Playfair Display', serif;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        /* Workflow Timeline Pipeline */
+        .timeline-node {
+            position: absolute;
+            left: -25px;
+            top: 4px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: white;
+            border: 3px solid var(--accent-green);
+            z-index: 10;
+        }
+
+        .timeline-node.highlight {
+            border-color: var(--accent-crimson);
+            background-color: var(--accent-crimson);
+        }
+
+        .timeline-node.gold {
+            border-color: var(--accent-gold);
+            background-color: var(--accent-gold);
+        }
+
+        #toc-drawer {
+            transition: transform 0.35s cubic-bezier(0.77, 0, 0.175, 1);
+        }
+
+        /* Metrics Badge */
+        .metric-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-rose-100 selection:text-rose-900">
+
+    <!-- Global Tooltip Element -->
+    <div id="global-tooltip" role="tooltip">
+        <strong id="tooltip-title" class="block text-rose-800 mb-1 border-b border-gray-100 pb-1"></strong>
+        <span id="tooltip-content" class="text-gray-600 block mt-1"></span>
+    </div>
+
+    <!-- Sticky Header -->
+    <header class="fixed top-0 w-full z-40 bg-[#F9F6F0]/95 backdrop-blur-md border-b border-[#E2DCD0] transition-transform duration-300">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <span class="font-sans text-xs font-bold tracking-widest uppercase text-white bg-[#8C3A3A] px-3 py-1 rounded-full shadow-sm">Whitepaper v3.0</span>
+                <span class="font-sans text-xs font-bold tracking-wider text-[#4A5D4E] bg-[#4A5D4E]/10 px-2.5 py-1 rounded-full border border-[#4A5D4E]/20 hidden sm:inline-block">Autonomous Multi-Agent</span>
+                <span class="font-sans text-sm font-medium text-gray-600 hidden md:inline-block">數位詮釋學體系：金標升級引擎</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <a href="#section-pilot" class="font-sans text-xs font-bold text-[#8C3A3A] hover:underline hidden lg:inline-block">實證試點：太 2:13–15 (17.1 → 97.0)</a>
+                <button id="toc-btn" class="font-sans text-sm font-medium flex items-center space-x-2 text-gray-800 hover:text-[#8C3A3A] transition-colors py-1 px-2 rounded-md hover:bg-black/5">
+                    <span>目錄導覽</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- TOC Drawer -->
+    <aside id="toc-drawer" class="fixed top-0 right-0 h-full w-84 max-w-[85vw] bg-white shadow-2xl z-50 transform translate-x-full overflow-y-auto">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                <div>
+                    <h3 class="font-sans font-bold text-lg text-gray-900">白皮書章節目錄</h3>
+                    <p class="font-sans text-xs text-gray-500">DHF v3.0 Multi-Agent Engine</p>
+                </div>
+                <button id="close-toc" class="text-gray-400 hover:text-gray-800 p-1 rounded hover:bg-gray-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <nav class="font-sans text-sm space-y-3.5">
+                <a href="#section-hero" class="block text-gray-600 hover:text-[#8C3A3A] hover:translate-x-1 transition-transform">00 / 導言與版本演進</a>
+                <a href="#section-adoption" class="block text-gray-600 hover:text-[#8C3A3A] hover:translate-x-1 transition-transform">01 / AI 採用五階模型：從腳本到蜂群</a>
+                <a href="#section-topology" class="block text-gray-600 hover:text-[#8C3A3A] hover:translate-x-1 transition-transform">02 / 星狀拓撲：無狀態指揮官與子代理</a>
+                <a href="#section-roster" class="block text-gray-600 hover:text-[#8C3A3A] hover:translate-x-1 transition-transform">03 / 十大方法論專家角色矩陣</a>
+                <a href="#section-pillars" class="block text-gray-600 hover:text-[#8C3A3A] hover:translate-x-1 transition-transform">04 / 六大金標支柱與雙層混合審查</a>
+                <a href="#section-engine" class="block text-gray-600 hover:text-[#8C3A3A] hover:translate-x-1 transition-transform">05 / 核心工程元件 (`council/upgrade/`)</a>
+                <a href="#section-pilot" class="block text-gray-600 hover:text-[#8C3A3A] hover:translate-x-1 transition-transform">06 / 實證數據：全書卷普查與試點躍升</a>
+                <a href="#section-downstream" class="block text-gray-600 hover:text-[#8C3A3A] hover:translate-x-1 transition-transform">07 / 解耦下游應用生態 (講道/查經/論文)</a>
+                <a href="#section-annotations" class="block text-gray-600 hover:text-[#8C3A3A] mt-6 pt-4 border-t border-gray-100">專有名詞注釋一覽</a>
+            </nav>
+        </div>
+    </aside>
+    <!-- Overlay for Drawer -->
+    <div id="drawer-overlay" class="fixed inset-0 bg-black/25 z-40 hidden backdrop-blur-sm transition-opacity"></div>
+
+    <!-- Main Content -->
+    <main class="pt-20 pb-32">
+        
+        <!-- Hero Section -->
+        <article id="section-hero" class="max-w-4xl mx-auto px-6 fade-in pt-12 pb-16">
+            <div class="mb-6 flex flex-wrap items-center gap-3 font-sans">
+                <span class="text-xs font-bold text-[#8C3A3A] tracking-widest uppercase">Research Whitepaper</span>
+                <span class="w-8 h-px bg-[#8C3A3A]"></span>
+                <span class="text-xs font-semibold text-gray-500">Google Antigravity-Native Architecture</span>
+                <span class="w-8 h-px bg-gray-300 hidden sm:inline-block"></span>
+                <span class="text-xs text-[#4A5D4E] font-medium hidden sm:inline-block">October 2026 Operational Release</span>
+            </div>
+            
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight mb-6 tracking-wide text-gray-900">
+                數位詮釋學體系<br>
+                <span class="text-2xl sm:text-3xl md:text-4xl text-[#8C3A3A] font-normal italic mt-2 block">
+                    自主多代理編排與金標升級引擎
+                </span>
+            </h1>
+
+            <p class="text-lg sm:text-xl text-gray-700 font-sans font-light leading-relaxed mb-8">
+                從單次程序腳本躍遷至具備<strong>自主審查、手術式補強與正向回饋</strong>的 AI 蜂群架構。<br>
+                這是一份面向全本聖經 66 卷書的工業級工程白皮書——解鎖研究生級別經文鑑別、古近東背景、原文字態與卡森誠信檢驗的持續知識複利。
+            </p>
+
+            <!-- Live Telemetry Card -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 bg-white border border-[#E2DCD0] rounded-xl shadow-sm font-sans mb-10">
+                <div>
+                    <span class="block text-xs font-bold uppercase text-gray-400">Canonical L3 Nodes</span>
+                    <span class="text-2xl font-bold text-gray-900 font-mono">750+</span>
+                    <span class="text-[11px] text-[#4A5D4E] block mt-0.5">9 卷書待審/升級</span>
+                </div>
+                <div>
+                    <span class="block text-xs font-bold uppercase text-gray-400">Total Wiki Entities</span>
+                    <span class="text-2xl font-bold text-gray-900 font-mono">4,627</span>
+                    <span class="text-[11px] text-gray-500 block mt-0.5">跨 L0–L5 六層本體</span>
+                </div>
+                <div>
+                    <span class="block text-xs font-bold uppercase text-gray-400">Pilot Score Jump</span>
+                    <span class="text-2xl font-bold text-[#8C3A3A] font-mono">17.1 → 97.0</span>
+                    <span class="text-[11px] text-[#8C3A3A] block mt-0.5">太 2:13–15 試點突破</span>
+                </div>
+                <div>
+                    <span class="block text-xs font-bold uppercase text-gray-400">Provenance Tags</span>
+                    <span class="text-2xl font-bold text-gray-900 font-mono">8,455</span>
+                    <span class="text-[11px] text-gray-500 block mt-0.5">5.9k 驗證 / 1.8k 否決</span>
+                </div>
+            </div>
+
+            <!-- Editor's Note & Companion Link -->
+            <div class="bg-white border border-[#E2DCD0] p-6 rounded-lg shadow-sm font-sans relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1.5 h-full bg-[#4A5D4E]"></div>
+                <h4 class="font-bold text-[#4A5D4E] mb-2 flex items-center text-sm">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                    編譯與實施背景說明
+                </h4>
+                <p class="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                    本文件為 <a href="file:///Users/WOLam/Documents/antigravity/DHF/DHF_WHITEPAPER.md" class="text-[#8C3A3A] font-semibold underline">DHF 2.0 基礎白皮書</a> 之升級運作篇。伴隨系統全面部署至 <span class="annotation-trigger" data-annotation="antigravity">Google Antigravity</span> 代理環境，系統已由「腳本調度單一模型」演進為「完全無狀態、自愈式循環的多代理蜂群編排體系（Multi-Agent Swarm Orchestration）」。點擊文中虛線底線詞彙可即時查閱工程注釋。
+                </p>
+            </div>
+        </article>
+
+        <!-- Section 01: AI Adoption Curve -->
+        <section id="section-adoption" class="max-w-4xl mx-auto px-6 fade-in mb-24">
+            <div class="flex items-center space-x-3 mb-2 font-sans">
+                <span class="text-xs font-bold text-[#8C3A3A] tracking-widest uppercase">01 / Adoption Maturity</span>
+                <span class="w-8 h-px bg-[#8C3A3A]"></span>
+                <span class="text-xs text-gray-500">The 5 Steps of AI Adoption</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-6">AI 採用的五階演進：從程序腳本到自主蜂群</h2>
+            
+            <p class="mb-6 leading-relaxed">
+                在處理神學註釋這種高度嚴謹且脈絡龐大的知識工程時，業界普遍面臨 AI 採用階梯上的瓶頸。DHF 體系的研發歷程精確對應了從簡單對話到自主生態的五大成熟度階段：
+            </p>
+
+            <!-- 5 Steps Grid -->
+            <div class="space-y-4 my-8 font-sans">
+                <div class="border border-gray-200 bg-white p-4 sm:p-5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 opacity-70">
+                    <div class="flex items-start space-x-3">
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-mono font-bold">Step 1</span>
+                        <div>
+                            <h4 class="font-bold text-gray-800 text-base">即時對話探索 (Ad-hoc Prompting)</h4>
+                            <p class="text-xs text-gray-500 mt-1">單次互動、複製貼上、缺乏持久記憶，高度依賴隨機提示詞且易滋生幻覺。</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-400 font-medium whitespace-nowrap">傳統 ChatBot 階段</span>
+                </div>
+
+                <div class="border border-gray-200 bg-white p-4 sm:p-5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 opacity-75">
+                    <div class="flex items-start space-x-3">
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-mono font-bold">Step 2</span>
+                        <div>
+                            <h4 class="font-bold text-gray-800 text-base">任務輔助與工具整合 (Task Copilot)</h4>
+                            <p class="text-xs text-gray-500 mt-1">導入特定 Prompt 範本與單一 CLI（如查辭典），仍由人類全程即時監控驅動。</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-400 font-medium whitespace-nowrap">IDE 輔助階段</span>
+                </div>
+
+                <div class="border border-sky-200 bg-sky-50/40 p-4 sm:p-5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-start space-x-3">
+                        <span class="px-2 py-0.5 bg-sky-100 text-sky-800 rounded text-xs font-mono font-bold">Step 3</span>
+                        <div>
+                            <h4 class="font-bold text-sky-950 text-base">程序式工作流自動化 (Workflow Pipelines)</h4>
+                            <p class="text-xs text-sky-800 mt-1">
+                                DHF v2.0 狀態：利用巨型單體 Python 腳本（如 <code class="font-mono text-xs bg-sky-100 px-1 py-0.5 rounded">execute_job_pericope.py</code>）串聯多步驟。痛點是單次生成過大易引發<strong>連線逾時 (EOF)</strong>，且一旦修改需全盤推倒重來。
+                            </p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-bold text-sky-700 whitespace-nowrap">單體腳本瓶頸</span>
+                </div>
+
+                <div class="border-2 border-[#16a34a] bg-emerald-50/50 p-5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                    <div class="flex items-start space-x-3">
+                        <span class="px-2.5 py-1 bg-[#16a34a] text-white rounded text-xs font-mono font-bold">Step 4 (Current)</span>
+                        <div>
+                            <h4 class="font-bold text-gray-900 text-base flex items-center">
+                                多代理編排與對抗審查 (Multi-Agent Swarm Orchestration)
+                                <span class="ml-2 text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-sans">Operational</span>
+                            </h4>
+                            <p class="text-xs text-gray-700 mt-1">
+                                DHF v3.0 核心突破：將 10 位專家實例化為專屬子代理，採用<strong>「先審查 $\rightarrow$ 僅針對弱項手術式補強 $\rightarrow$ 卡森閘門否決」</strong>架構，不碰健康內容，每單元檔案嚴格小於 2 萬字。
+                            </p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-bold text-[#16a34a] whitespace-nowrap">星狀蜂群編排</span>
+                </div>
+
+                <div class="border-2 border-[#d97706] bg-amber-50/50 p-5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                    <div class="flex items-start space-x-3">
+                        <span class="px-2.5 py-1 bg-[#d97706] text-white rounded text-xs font-mono font-bold">Step 5 (Active)</span>
+                        <div>
+                            <h4 class="font-bold text-gray-900 text-base flex items-center">
+                                自主運作與知識複利生態 (Self-Governing AI-Native Ecosystem)
+                                <span class="ml-2 text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-sans">Daemon</span>
+                            </h4>
+                            <p class="text-xs text-gray-700 mt-1">
+                                每 3 小時 Cron 自動喚醒無狀態指揮官，以磁碟總帳（<code class="font-mono text-xs bg-amber-100 px-1 py-0.5 rounded">ledger.json</code>）原子搶鎖、配額監控與自愈重試，長達數週無人值守運作，全自動回饋 L1/L2/L3 維基網絡。
+                            </p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-bold text-[#d97706] whitespace-nowrap">連續背景自治</span>
+                </div>
+            </div>
+
+            <div class="quote-box p-6 my-6 font-serif italic text-base sm:text-lg text-gray-800 rounded-r-lg">
+                「在 Step 3，代碼負責調度模型，一處出錯全盤崩潰；在 Step 4/5，具備方法論與誠信工具的代理團隊彼此制衡，代碼僅作為防護閘門與檔案契約。」
+            </div>
+        </section>
+
+        <!-- Section 02: Topology & Orchestration Pattern -->
+        <section id="section-topology" class="max-w-4xl mx-auto px-6 fade-in mb-24">
+            <div class="flex items-center space-x-3 mb-2 font-sans">
+                <span class="text-xs font-bold text-[#8C3A3A] tracking-widest uppercase">02 / System Topology</span>
+                <span class="w-8 h-px bg-[#8C3A3A]"></span>
+                <span class="text-xs text-gray-500">File-Mediated Hub-and-Spoke</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-6">星狀多代理工作流：無狀態指揮官與磁碟契約</h2>
+
+            <p class="mb-6 leading-relaxed">
+                傳統多代理常面臨「群聊失控（Chatter Loops）」或併發寫入衝突。DHF 實施了嚴格的<strong>「以檔案為唯一通訊媒介的星狀（Hub-and-Spoke）拓撲」</strong>：
+            </p>
+
+            <!-- Topology Interactive Diagram Container -->
+            <div class="bg-[#21252B] text-gray-200 p-6 sm:p-8 rounded-xl shadow-xl my-8 font-sans overflow-x-auto">
+                <div class="flex items-center justify-between border-b border-gray-700 pb-4 mb-6">
+                    <div>
+                        <span class="text-xs font-mono text-[#8C3A3A] font-bold uppercase tracking-wider block">Runtime Topology</span>
+                        <h4 class="text-white text-lg font-bold">星狀自主排程管線 (State Machine Loop)</h4>
+                    </div>
+                    <span class="text-xs bg-gray-800 text-gray-400 px-2.5 py-1 rounded font-mono">POSIX fcntl.flock</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+                    <div class="bg-gray-800/80 p-3.5 rounded-lg border border-gray-700">
+                        <span class="text-[10px] text-amber-400 font-mono font-bold block mb-1">0. SCHEDULER</span>
+                        <h5 class="font-bold text-white mb-1">Cron Wake-up</h5>
+                        <p class="text-gray-400 text-[11px] leading-relaxed">每 3 小時喚醒，生成拋棄式 Conductor 子代理，自身不留存會話累積記憶。</p>
+                    </div>
+                    <div class="bg-gray-800/80 p-3.5 rounded-lg border border-gray-700">
+                        <span class="text-[10px] text-sky-400 font-mono font-bold block mb-1">1. AUDIT</span>
+                        <h5 class="font-bold text-white mb-1">雙層初審 (Auditor)</h5>
+                        <p class="text-gray-400 text-[11px] leading-relaxed">執行正則 AST 標記審查與 LLM 評分。若原註釋已達 85 分則直接跳過。</p>
+                    </div>
+                    <div class="bg-gray-800/80 p-3.5 rounded-lg border border-gray-700">
+                        <span class="text-[10px] text-emerald-400 font-mono font-bold block mb-1">2. SURGICAL</span>
+                        <h5 class="font-bold text-white mb-1">定向專家補強</h5>
+                        <p class="text-gray-400 text-[11px] leading-relaxed">僅派出不合格支柱的專家。每人以嚴格英文檢索 NotebookLM 資料庫。</p>
+                    </div>
+                    <div class="bg-gray-800/80 p-3.5 rounded-lg border border-red-500/50 bg-red-950/20">
+                        <span class="text-[10px] text-red-400 font-mono font-bold block mb-1">3. ADVERSARIAL</span>
+                        <h5 class="font-bold text-white mb-1">卡森誠信閘門</h5>
+                        <p class="text-gray-300 text-[11px] leading-relaxed">審核全數論點，賦予標籤；若違背字根謬誤或引文漂移，一票否決回退。</p>
+                    </div>
+                    <div class="bg-gray-800/80 p-3.5 rounded-lg border border-gray-700">
+                        <span class="text-[10px] text-purple-400 font-mono font-bold block mb-1">4. PRECIPITATION</span>
+                        <h5 class="font-bold text-white mb-1">原子裝配與沉澱</h5>
+                        <p class="text-gray-400 text-[11px] leading-relaxed">Synthesizer 組裝 8 個分塊檔案，驗證 7 項不變量後備份原檔並覆寫。</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-gray-700/80 text-[11px] text-gray-400 flex flex-wrap gap-4 items-center justify-between">
+                    <span>⚡ 併發控制：每次喚醒處理 2 經段併發（上限 6 段）</span>
+                    <span>🛡️ 配額哨兵：滑動 85% 或每週 80% 自動休眠</span>
+                    <span>💾 原檔備份：<code class="text-gray-300">wiki/_archive/YYYY-MM-DD/</code></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 03: The 10 Specialized Agents Roster -->
+        <section id="section-roster" class="max-w-4xl mx-auto px-6 fade-in mb-24">
+            <div class="flex items-center space-x-3 mb-2 font-sans">
+                <span class="text-xs font-bold text-[#8C3A3A] tracking-widest uppercase">03 / Agent Specialization</span>
+                <span class="w-8 h-px bg-[#8C3A3A]"></span>
+                <span class="text-xs text-gray-500">Curated Methodology Corpora</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-6">十大方法論專家角色矩陣</h2>
+
+            <p class="mb-6 leading-relaxed">
+                在 DHF 中，沒有全知全能的「通用神學 AI」。每位代理均嚴格綁定特定的<strong>【方法論】研究筆記本</strong>、原生典籍 API 與工具權限，並遵守「上游查詢一律採用嚴謹學術英文」之核心鐵律：
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-8 font-sans">
+                <!-- Agent 1 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm hover:border-[#4A5D4E] transition-all">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">P1 / P6</span>
+                        <span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono">Write + CLI</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-1">書卷結構分析家 (agent_book_exegete)</h4>
+                    <p class="text-xs text-gray-600 mb-3">負責書卷宏觀文學架構、交錯平行（Chiasm）、包夾結構（Inclusio）與前後經段的過渡跑道。</p>
+                    <div class="text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                        <strong>知識庫：</strong>指定書卷【經卷】筆記本 · <strong>工具：</strong>Levinsohn 篇章小句層級
+                    </div>
+                </div>
+
+                <!-- Agent 2 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm hover:border-[#4A5D4E] transition-all">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">P2 (NT, 20 pts)</span>
+                        <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono">OpenGNT + MCP</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-1">新約希臘文語言學家 (agent_greek_linguist)</h4>
+                    <p class="text-xs text-gray-600 mb-3">揚棄時態時間論，強制採用現代動詞體貌論（Porter / Campbell / Fanning）與篇章凸顯標記。</p>
+                    <div class="text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                        <strong>知識庫：</strong>希臘文新約【方法論】 · <strong>工具：</strong>OpenGNT (NA28 / RMAC)
+                    </div>
+                </div>
+
+                <!-- Agent 3 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm hover:border-[#4A5D4E] transition-all">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">P2 (OT, 20 pts)</span>
+                        <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-mono">Sefaria + MCP</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-1">古代近東與希伯來專家 (agent_ane_specialist)</h4>
+                    <p class="text-xs text-gray-600 mb-3">精準拆解馬索拉文字小句語法（Wayyiqtol / Qatal / Yiqtol）、字態語義（Binyanim）與古近東盟約條款。</p>
+                    <div class="text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                        <strong>知識庫：</strong>古近東 ANE【方法論】 · <strong>工具：</strong>Sefaria API (MT, BDB)
+                    </div>
+                </div>
+
+                <!-- Agent 4 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm hover:border-[#4A5D4E] transition-all">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">P3 (20 pts)</span>
+                        <span class="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-mono">Hays + Beale</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-1">正典文本互涉專家 (agent_intertextuality)</h4>
+                    <p class="text-xs text-gray-600 mb-3">嚴格套用 Richard Hays 7 大回響檢驗標準、Beale 預表漸進發展，並比對 MT 與 LXX / 他爾根異文底本。</p>
+                    <div class="text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                        <strong>知識庫：</strong>文本互涉【方法論】 · <strong>工具：</strong>Targum Onkelos / Jonathan
+                    </div>
+                </div>
+
+                <!-- Agent 5 & 6 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm hover:border-[#4A5D4E] transition-all">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">P4 (Joint, 15 pts)</span>
+                        <span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono">Historical MCP</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-1">第二聖殿時期文獻家 (agent_second_temple)</h4>
+                    <p class="text-xs text-gray-600 mb-3">考證次經、偽經（以諾一書、禧年書、所羅門詩篇）、死海古卷（1QS, CD, 1QM, 4Q）與約瑟夫斯、斐羅。</p>
+                    <div class="text-[11px] text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                        <strong>知識庫：</strong>第二聖殿時期【方法論】 · <strong>聯席：</strong>希羅文化 / 猶太傳統
+                    </div>
+                </div>
+
+                <!-- Agent 7: Gatekeeper -->
+                <div class="border-2 border-[#8C3A3A]/40 bg-red-50/40 p-5 rounded-lg shadow-sm relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1.5 h-full bg-[#8C3A3A]"></div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-[#8C3A3A] font-mono">P5 (Stage 2.5 Gate, 15 pts)</span>
+                        <span class="text-[10px] bg-red-100 text-red-900 px-2 py-0.5 rounded font-mono font-bold">VETO POWER</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-1">卡森誠信檢驗官 (agent_carson_gatekeeper)</h4>
+                    <p class="text-xs text-gray-700 mb-3">必跑對抗節點。逐條審查卡森《解經謬誤》（字根謬誤、時代錯置、全稱移轉），賦予 [VERIFIED] / [DISPUTED] / [VETOED]。</p>
+                    <div class="text-[11px] text-gray-600 bg-white/80 p-2 rounded border border-red-200">
+                        <strong>知識庫：</strong>學術研究 NT801【方法論】 · <strong>約束：</strong>否決兩次即自動升級通報
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 04: The 6 Pillars & Hybrid Audit -->
+        <section id="section-pillars" class="max-w-4xl mx-auto px-6 fade-in mb-24">
+            <div class="flex items-center space-x-3 mb-2 font-sans">
+                <span class="text-xs font-bold text-[#8C3A3A] tracking-widest uppercase">04 / The Gold Standard</span>
+                <span class="w-8 h-px bg-[#8C3A3A]"></span>
+                <span class="text-xs text-gray-500">Matthew 9:35–38 Benchmark</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-6">六大金標支柱與雙層混合審查機制</h2>
+
+            <p class="mb-6 leading-relaxed">
+                全本聖經 750+ 經段的每一篇 L3 神學註釋，均必須通過以<strong>馬太福音 9:35–38 金標範例</strong>為基準的六大客觀支柱（總分 100 分）。系統捨棄了傳統 LLM 的寬鬆主觀打分，實施「正則 AST 標記掃描」與「LLM 語義審查」之雙層混合架構：
+            </p>
+
+            <!-- 6 Pillars Score Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-8 font-sans">
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">Pillar 1 (Weight: 15)</span>
+                        <span class="text-xs font-mono font-bold text-gray-600">Floor Cap: 6.0</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-2">宏觀文學結構與篇章跑道 (Macro-Literary)</h4>
+                    <p class="text-xs text-gray-600 mb-2">判定經段於書卷五大段落或書信辯證法中的定位、首尾呼應（Inclusio）與承先啟後的語法過渡鉸鏈。</p>
+                    <span class="text-[11px] text-gray-500 block">硬性指標：至少 1 幅結構圖表/大綱，明確點名並連繫前後緊鄰經段。</span>
+                </div>
+
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">Pillar 2 (Weight: 20)</span>
+                        <span class="text-xs font-mono font-bold text-gray-600">Floor Cap: 8.0</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-2">原文字態語法與現代動詞體貌論 (Syntax & Aspect)</h4>
+                    <p class="text-xs text-gray-600 mb-2">區分語義體貌（完成體/未完成體/靜態結果體）與情態，標註小句篇章階層與資訊凸顯（背景/前景/焦點）。</p>
+                    <span class="text-[11px] text-gray-500 block">硬性指標：依經文字數成比例的希臘/希伯來詞元密度分析與體貌詞彙。</span>
+                </div>
+
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">Pillar 3 (Weight: 20)</span>
+                        <span class="text-xs font-mono font-bold text-gray-600">Floor Cap: 8.0</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-2">正典文本互涉與七十士譯本底本 (Intertextuality)</h4>
+                    <p class="text-xs text-gray-600 mb-2">套用 Richard Hays 7 項檢驗標準（可得性、音量、復現性、滿足感等），嚴謹比對 MT、LXX 與他爾根異文。</p>
+                    <span class="text-[11px] text-gray-500 block">硬性指標：評估至少 3 項 Hays 標準，並提供古代譯本底本異文對照矩陣。</span>
+                </div>
+
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">Pillar 4 (Weight: 15)</span>
+                        <span class="text-xs font-mono font-bold text-gray-600">Floor Cap: 6.0</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-2">第二聖殿文獻與社會歷史視野 (Second Temple)</h4>
+                    <p class="text-xs text-gray-600 mb-2">還原死海古卷、猶太偽經、斐羅、約瑟夫斯及具備斷代意識的早期塔納姆拉比傳統，考察古近東與希羅背景。</p>
+                    <span class="text-[11px] text-gray-500 block">硬性指標：至少引證 1 次死海古卷或第二聖殿時期一手文獻原典。</span>
+                </div>
+
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-[#8C3A3A] font-mono">Pillar 5 (Weight: 15)</span>
+                        <span class="text-xs font-mono font-bold text-gray-600">Floor Cap: 6.0</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-2">卡森誠信檢驗與血緣標籤 (Carson Integrity Gate)</h4>
+                    <p class="text-xs text-gray-600 mb-2">強制審查詞源字根謬誤、時代錯置與全稱移轉，為所有核心論斷標註 [VERIFIED] / [DISPUTED] / [VETOED]。</p>
+                    <span class="text-[11px] text-gray-500 block">硬性指標：明確的標籤計數統計，且正文中嚴禁殘留任何被否決觀點。</span>
+                </div>
+
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs font-bold text-[#4A5D4E] font-mono">Pillar 6 (Weight: 15)</span>
+                        <span class="text-xs font-mono font-bold text-gray-600">Floor Cap: 6.0</span>
+                    </div>
+                    <h4 class="font-bold text-gray-900 text-base mb-2">統一神學命題與思維不斷鏈 (Unified Proposition)</h4>
+                    <p class="text-xs text-gray-600 mb-2">依據 Kuruvilla / Kaiser 的段落神學鍛造單一 Big Idea，構建連貫的辯證思維鏈，並提供 SBL 頂級註釋引證。</p>
+                    <span class="text-[11px] text-gray-500 block">硬性指標：至少 5 條出自 ICC, Hermeneia, NIGTC, BECNT, WBC, NICNT 的引文。</span>
+                </div>
+            </div>
+
+            <!-- Floor Cap Rule Callout -->
+            <div class="gold-box p-6 rounded-r-lg font-sans">
+                <h4 class="font-bold text-[#B8860B] text-base mb-1">硬性底線截斷規則 (Floor Cap Mechanism)</h4>
+                <p class="text-xs sm:text-sm text-gray-700 leading-relaxed">
+                    通過標準為<strong>「總分 $\ge 85.0$ 且每一單項得分不得低於該項權重之 50%」</strong>。即使 LLM 評審給予高分，只要正則掃描器判定任一支柱的客觀標記覆蓋率低於 0.50，該支柱得分將<strong>被強制截斷在最高權重的 40%</strong>（例如 P2 最高僅能得 8 分），迫使系統必須啟動專家重補。
+                </p>
+            </div>
+        </section>
+
+        <!-- Section 05: Core Engineering Modules -->
+        <section id="section-engine" class="max-w-4xl mx-auto px-6 fade-in mb-24">
+            <div class="flex items-center space-x-3 mb-2 font-sans">
+                <span class="text-xs font-bold text-[#8C3A3A] tracking-widest uppercase">05 / Engineering Modules</span>
+                <span class="w-8 h-px bg-[#8C3A3A]"></span>
+                <span class="text-xs text-gray-500">council/upgrade/</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-6">核心工程元件與防護體系</h2>
+
+            <p class="mb-6 leading-relaxed">
+                為確保數週無人值守的自主運行安全，DHF 構建了四大彼此獨立、經 17 項單元測試（<code class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">test_upgrade_engine.py</code>）嚴格驗證的工程模組：
+            </p>
+
+            <div class="space-y-4 my-8 font-sans">
+                <!-- Module 1 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-mono font-bold">1. pillar_scorer.py</span>
+                            <h4 class="font-bold text-gray-900 text-base">雙語確定性審查器</h4>
+                        </div>
+                        <span class="text-xs text-gray-500 font-mono">Bilingual AST Regex Scanner</span>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        支援英文與繁體中文（47 篇歷史遺留註釋）雙向掃描。能在 15 秒內精確普查全庫 901 篇註釋，輸出結構化指標字典與缺漏清單，無任何 LLM Token 開銷。
+                    </p>
+                </div>
+
+                <!-- Module 2 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-mono font-bold">2. ledger.py</span>
+                            <h4 class="font-bold text-gray-900 text-base">原子磁碟總帳與配額哨兵</h4>
+                        </div>
+                        <span class="text-xs text-gray-500 font-mono">Single Source of Truth</span>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        以 POSIX <code class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">fcntl.flock</code> 鎖定保護 <code class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">ledger.json</code>。實施「最弱者優先隊列」、書卷閘門管制、與 NotebookLM 滾動 85% / 每週 80% 配額防護（Exit 3 乾淨休眠）。
+                    </p>
+                </div>
+
+                <!-- Module 3 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-mono font-bold">3. upgrade_runner.py</span>
+                            <h4 class="font-bold text-gray-900 text-base">分塊工作區與起飛前防護網</h4>
+                        </div>
+                        <span class="text-xs text-gray-500 font-mono">--check & --apply Protocol</span>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        遵守核心鐵律 5：將單一經段工作區切分為 8 個模組小檔（均 &lt; 2 萬字）。寫入前強制檢查 7 項不變量：英文查詢記錄、無被否決內容殘留、篇幅保留 $\ge 90\%$ 與通過 85 分門檻。
+                    </p>
+                </div>
+
+                <!-- Module 4 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-mono font-bold">4. archive.py</span>
+                            <h4 class="font-bold text-gray-900 text-base">零數據遺失備份與即時回滾</h4>
+                        </div>
+                        <span class="text-xs text-gray-500 font-mono">Zero-Loss Snapshotting</span>
+                    </div>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        在任何寫入前，原子複製原檔至 <code class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">wiki/_archive/YYYY-MM-DD/</code> 並記錄清單。支援 <code class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">upgrade_runner.py --restore &lt;ID&gt;</code> 一鍵無損還原 L3、L2 檔案並清掃新增的 L1 筆記。
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 06: Empirical Baseline & Pilot Breakthrough -->
+        <section id="section-pilot" class="max-w-4xl mx-auto px-6 fade-in mb-24">
+            <div class="flex items-center space-x-3 mb-2 font-sans">
+                <span class="text-xs font-bold text-[#8C3A3A] tracking-widest uppercase">06 / Empirical Proof</span>
+                <span class="w-8 h-px bg-[#8C3A3A]"></span>
+                <span class="text-xs text-gray-500">Baseline Audit & Pilot Case Study</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-6">實證數據：全書卷普查與試點躍升</h2>
+
+            <p class="mb-6 leading-relaxed">
+                在 Phase 0 階段，升級引擎普查了全庫 9 卷核心書卷的 750 篇正則待審經段（排除 150 篇 PS 重複檔案與 1 篇金標固定範本）。結果清晰揭示了初版註釋的質量落差與優先升級路徑：
+            </p>
+
+            <!-- Baseline Table -->
+            <div class="overflow-x-auto my-6 border border-[#E2DCD0] rounded-xl bg-white shadow-sm font-sans">
+                <table class="w-full text-left text-xs sm:text-sm">
+                    <thead class="bg-gray-50/80 text-gray-700 font-bold border-b border-[#E2DCD0]">
+                        <tr>
+                            <th class="py-3 px-4">隊列順序</th>
+                            <th class="py-3 px-4">經卷名稱 (Corpus)</th>
+                            <th class="py-3 px-4">正典經段數 ($n$)</th>
+                            <th class="py-3 px-4">初始基準均分</th>
+                            <th class="py-3 px-4">閘門狀態</th>
+                            <th class="py-3 px-4">核心缺損支柱</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 text-gray-600">
+                        <tr class="bg-rose-50/30">
+                            <td class="py-3 px-4 font-mono font-bold text-[#8C3A3A]">1 (Active)</td>
+                            <td class="py-3 px-4 font-bold text-gray-900">馬太福音 (Matthew)</td>
+                            <td class="py-3 px-4 font-mono">111</td>
+                            <td class="py-3 px-4 font-mono font-bold text-[#8C3A3A]">24.3</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-mono text-xs font-bold">OPEN</span></td>
+                            <td class="py-3 px-4">P2 (動詞體貌)、P4 (猶太偽經)、P5 (卡森標籤)</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-mono">2</td>
+                            <td class="py-3 px-4 font-bold text-gray-900">創世記 (Genesis)</td>
+                            <td class="py-3 px-4 font-mono">164</td>
+                            <td class="py-3 px-4 font-mono">52.3</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-mono text-xs">LOCKED</span></td>
+                            <td class="py-3 px-4">P2 (小句語法)、P3 (Hays 7 標準)</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-mono">3</td>
+                            <td class="py-3 px-4 font-bold text-gray-900">啟示錄 (Revelation)</td>
+                            <td class="py-3 px-4 font-mono">18</td>
+                            <td class="py-3 px-4 font-mono">62.2</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-mono text-xs">LOCKED</span></td>
+                            <td class="py-3 px-4">P2 (篇章凸顯)、P5 (對抗性審查)</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-mono">4</td>
+                            <td class="py-3 px-4 font-bold text-gray-900">約伯記 (Job)</td>
+                            <td class="py-3 px-4 font-mono">61</td>
+                            <td class="py-3 px-4 font-mono">62.7</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-mono text-xs">LOCKED</span></td>
+                            <td class="py-3 px-4">P1 (哀歌文學框)、P3 (底本異文對照)</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-mono">5</td>
+                            <td class="py-3 px-4 font-bold text-gray-900">以弗所書 (Ephesians)</td>
+                            <td class="py-3 px-4 font-mono">17</td>
+                            <td class="py-3 px-4 font-mono">83.9</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-mono text-xs">LOCKED</span></td>
+                            <td class="py-3 px-4">微量 P4 碑文歷史背景微調</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-mono">6–7</td>
+                            <td class="py-3 px-4 font-bold text-gray-900">路加－使徒行傳 (Luke-Acts)</td>
+                            <td class="py-3 px-4 font-mono">177</td>
+                            <td class="py-3 px-4 font-mono">67.8</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-mono text-xs">LOCKED</span></td>
+                            <td class="py-3 px-4">P2 (Levinsohn 階層)、P4 (羅馬榮辱)</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-mono">8</td>
+                            <td class="py-3 px-4 font-bold text-gray-900">詩篇 (Psalms)</td>
+                            <td class="py-3 px-4 font-mono">150</td>
+                            <td class="py-3 px-4 font-mono">79.9</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-mono text-xs">LOCKED</span></td>
+                            <td class="py-3 px-4">P1 (五卷縫合縫隙)、P4 (烏加列禮儀)</td>
+                        </tr>
+                        <tr class="bg-emerald-50/30">
+                            <td class="py-3 px-4 font-mono font-bold text-emerald-800">9</td>
+                            <td class="py-3 px-4 font-bold text-gray-900">羅馬書 (Romans)</td>
+                            <td class="py-3 px-4 font-mono">52</td>
+                            <td class="py-3 px-4 font-mono font-bold text-emerald-700">91.9</td>
+                            <td class="py-3 px-4"><span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-mono text-xs">LOCKED</span></td>
+                            <td class="py-3 px-4">已達全金標水平（全庫之範本標竿）</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pilot Deep Dive -->
+            <div class="border-2 border-[#8C3A3A] bg-white rounded-xl p-6 sm:p-8 my-8 shadow-md font-sans">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-4 mb-6">
+                    <div>
+                        <span class="text-xs font-bold text-[#8C3A3A] tracking-wider uppercase">Phase 1 Pilot Benchmark</span>
+                        <h3 class="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
+                            馬太福音 2:13–15 試點突破報告（逃往埃及與何西阿書 11:1）
+                        </h3>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs px-2.5 py-1 bg-red-100 text-red-800 rounded font-mono font-bold">原初: 17.1</span>
+                        <span class="text-gray-400">➔</span>
+                        <span class="text-sm px-3 py-1 bg-emerald-100 text-emerald-800 rounded font-mono font-bold">升級: 97.0 / 100</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs mb-6">
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                        <span class="font-bold text-gray-700 block mb-1">【原初版本病灶】評分 17.1 (LLM: 22.0)</span>
+                        <ul class="space-y-1.5 text-gray-600 list-disc list-inside">
+                            <li>原文字態：僅 4 個零散希臘單詞，無任何動詞體貌分析。</li>
+                            <li>文本互涉：直接斷言「應驗何西阿書 11:1」，忽略 MT 單數與 LXX 複數之底本關鍵分歧。</li>
+                            <li>歷史背景：完全遺漏斐羅、約瑟夫斯及死海古卷等第二聖殿一手文獻。</li>
+                            <li>誠信檢驗：未標註任何卡森謬誤標籤，未處理 McCasland 斷章取義爭端。</li>
+                        </ul>
+                    </div>
+                    <div class="bg-emerald-50/50 p-4 rounded-lg border border-emerald-200">
+                        <span class="font-bold text-emerald-900 block mb-1">【多代理升級成效】博士級評分 97.0 / 100</span>
+                        <ul class="space-y-1.5 text-emerald-800 list-disc list-inside">
+                            <li><strong>571 原文字態標記</strong>：17 小句 Levinsohn 階層、三祈使動詞體貌對比。</li>
+                            <li><strong>五大證人底本矩陣</strong>：證實馬太直通希伯來 MT 單數 <code class="font-mono">לִבְנִי</code>、Hays 七標準全過。</li>
+                            <li><strong>一手古代文獻</strong>：整合奧古斯都埃及行省管轄權、Pseudo-Philo 摩西生平傳統。</li>
+                            <li><strong>卡森審查報告</strong>：13 條標籤（11 驗證、2 爭議、2 否決），引證 23 條 SBL 頂級註釋。</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="text-[11px] text-gray-500 bg-gray-50 p-3 rounded border border-gray-200 flex flex-wrap justify-between items-center gap-2">
+                    <span>驗證成果已同步沉澱至：<code class="font-mono text-gray-700">wiki/03_Theological_Commentaries/Matthew_213-15_commentary.md</code></span>
+                    <span class="text-emerald-700 font-bold">READY ✅ Approved & Applied</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 07: Downstream Generation Ecosystem -->
+        <section id="section-downstream" class="max-w-4xl mx-auto px-6 fade-in mb-24">
+            <div class="flex items-center space-x-3 mb-2 font-sans">
+                <span class="text-xs font-bold text-[#8C3A3A] tracking-widest uppercase">07 / Downstream Ecosystem</span>
+                <span class="w-8 h-px bg-[#8C3A3A]"></span>
+                <span class="text-xs text-gray-500">Decoupled Generation Skills</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-6">解耦下游應用生態：從經文核查到多維輸出</h2>
+
+            <p class="mb-6 leading-relaxed">
+                DHF 的關鍵架構準則是<strong>「上游學術維基維持 100% 英文學術中立，下游各類應用完全解耦獨立」</strong>。透過共用的基礎模組（<code class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">council/wiki_reader.py</code>），各個自主應用技能按需讀取已驗證的維基節點，並各自執行專屬的品質審查：
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 my-8 font-sans">
+                <!-- Skill 1 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-[#4A5D4E] uppercase tracking-wider block mb-1">Pedagogy</span>
+                        <h4 class="font-bold text-gray-900 text-base mb-2">閉環查經教案<br><span class="text-xs text-gray-500 font-normal">dhf-bible-study</span></h4>
+                        <p class="text-xs text-gray-600 leading-relaxed mb-4">
+                            產出四步「破冰 $\rightarrow$ 觀察 $\rightarrow$ 詮釋 $\rightarrow$ 應用」之繁體中文查經教案，自帶「摩擦力測試」自審與帶領者避坑指南。
+                        </p>
+                    </div>
+                    <span class="text-[11px] bg-emerald-50 text-emerald-800 px-2 py-1 rounded font-medium text-center">9 組教案已驗證</span>
+                </div>
+
+                <!-- Skill 2 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-[#2563eb] uppercase tracking-wider block mb-1">Homiletics</span>
+                        <h4 class="font-bold text-gray-900 text-base mb-2">釋經講道講章<br><span class="text-xs text-gray-500 font-normal">dhf-sermon-crafter</span></h4>
+                        <p class="text-xs text-gray-600 leading-relaxed mb-4">
+                            融合 Bryan Chapell 墜落光景焦點（FCF）與 Robinson 單一命題架構，直接生成 4,500 字未刪節講章與三層應用矩陣。
+                        </p>
+                    </div>
+                    <span class="text-[11px] bg-blue-50 text-blue-800 px-2 py-1 rounded font-medium text-center">10 篇講章已入庫</span>
+                </div>
+
+                <!-- Skill 3 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-[#d97706] uppercase tracking-wider block mb-1">Academic Thesis</span>
+                        <h4 class="font-bold text-gray-900 text-base mb-2">研究生學術論文<br><span class="text-xs text-gray-500 font-normal">dhf-thesis-architect</span></h4>
+                        <p class="text-xs text-gray-600 leading-relaxed mb-4">
+                            以 L5 爭議註冊表為起點，自動撰寫 5,000–12,000 字具備 Turabian 8th 腳註與 SBL 標準縮寫的期刊草稿與論文篇章。
+                        </p>
+                    </div>
+                    <span class="text-[11px] bg-amber-50 text-amber-800 px-2 py-1 rounded font-medium text-center">27 個爭議點對接</span>
+                </div>
+
+                <!-- Skill 4 -->
+                <div class="border border-[#E2DCD0] bg-white p-5 rounded-lg shadow-sm flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold text-[#c026d3] uppercase tracking-wider block mb-1">Peer Review</span>
+                        <h4 class="font-bold text-gray-900 text-base mb-2">學術書評專員<br><span class="text-xs text-gray-500 font-normal">dhf-book-reviewer</span></h4>
+                        <p class="text-xs text-gray-600 leading-relaxed mb-4">
+                            嚴格踐行富勒神學院 NT801 標準：50% 實質摘要、50% 批判評析，且 100% 括號頁碼均經 NotebookLM 一手文獻驗證。
+                        </p>
+                    </div>
+                    <span class="text-[11px] bg-purple-50 text-purple-800 px-2 py-1 rounded font-medium text-center">Zero-Ghost Locators</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Annotations List Section -->
+        <section id="section-annotations" class="max-w-4xl mx-auto px-6 fade-in mt-20 pt-12 border-t-2 border-[#E2DCD0]">
+            <h3 class="text-2xl font-bold mb-8 font-display">專有名詞與技術注釋一覽</h3>
+            <div class="space-y-6 font-sans text-xs sm:text-sm text-gray-700">
+                <div class="pl-4 border-l-2 border-[#8C3A3A]">
+                    <p class="mb-1"><span class="font-bold text-gray-900">【註1】Multi-Agent Swarm Orchestration（多代理蜂群編排）</span></p>
+                    <p>將複雜大型任務拆解予多案內具備專門工具與知識庫的專屬子代理，透過確定性總帳與檔案契約彼此制衡與協作的架構，解決單一提示詞的認知邊界問題。</p>
+                </div>
+                <div class="pl-4 border-l-2 border-[#8C3A3A]">
+                    <p class="mb-1"><span class="font-bold text-gray-900">【註2】POSIX fcntl.flock（檔案級互斥鎖）</span></p>
+                    <p>Unix/Linux 系統原生之底層檔案鎖定協議。DHF 用以保護 <code class="font-mono">ledger.json</code> 總帳，防止每 3 小時喚醒的定時任務在併發運行時發生競爭危害（Race Condition）。</p>
+                </div>
+                <div class="pl-4 border-l-2 border-[#8C3A3A]">
+                    <p class="mb-1"><span class="font-bold text-gray-900">【註3】Surgical Gap-Fill（手術式補強）</span></p>
+                    <p>不同於全盤推倒重寫，系統透過初審確定 deficient pillars，僅喚醒對應專家檢索並重寫該章節，強制要求保留原稿 $\ge 90\%$ 篇幅，保護既有研發成果。</p>
+                </div>
+                <div class="pl-4 border-l-2 border-[#8C3A3A]">
+                    <p class="mb-1"><span class="font-bold text-gray-900">【註4】Richard Hays's 7 Echo Criteria（理查·海斯 7 大回響標準）</span></p>
+                    <p>新約聖經學者 Richard Hays 提出的文本互涉鑑別法（可得性、音量、復現性、主題連貫、歷史合理性、詮釋史、滿足感），用以防堵解經學者陷入過度聯想（Parallelomania）。</p>
+                </div>
+                <div class="pl-4 border-l-2 border-[#8C3A3A]">
+                    <p class="mb-1"><span class="font-bold text-gray-900">【註5】Modern Verbal Aspect Theory（現代動詞體貌論）</span></p>
+                    <p>由 Stanley Porter, Constantine Campbell, Buist Fanning 確立的古希臘文語法理論。主張動詞核心在於說話者觀看事件的視角體貌（完成體/未完成體/靜態結果體），而非傳統印歐語系的時間過去式概念。</p>
+                </div>
+                <div class="pl-4 border-l-2 border-[#8C3A3A]">
+                    <p class="mb-1"><span class="font-bold text-gray-900">【註6】D.A. Carson's Exegetical Fallacies（卡森解經謬誤）</span></p>
+                    <p>著名新約學者 D.A. 卡森所歸納的常見釋經錯誤，如字根謬誤（Root Fallacy）、全稱移轉（Totality Transfer）與時代錯置（Semantic Anachronism），由卡森檢驗官在 Stage 2.5 強制把關。</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-[#E2DCD0] py-10 font-sans">
+        <div class="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-500">
+            <div>
+                <p class="font-bold text-gray-800 text-sm">數位詮釋學體系研發聯盟 (Digital Hermeneutics Framework)</p>
+                <p class="mt-1">Operational Architecture v3.0 · Built with Google Antigravity & Claude Code</p>
+            </div>
+            <div class="flex items-center space-x-6">
+                <a href="file:///Users/WOLam/Documents/antigravity/DHF/DHF_MULTI_AGENT_ORCHESTRATION_WHITEPAPER.md" class="text-[#8C3A3A] font-medium hover:underline">升級白皮書原典 (.md)</a>
+                <a href="file:///Users/WOLam/Documents/antigravity/DHF/DHF_WHITEPAPER.md" class="text-gray-600 hover:text-gray-900">DHF 2.0 基礎白皮書</a>
+                <a href="https://github.com/shmuel310/digital_hermeneutics_framework" class="text-gray-600 hover:text-gray-900">GitHub Repository</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        const annotations = {
+            'antigravity': {
+                title: 'Google Antigravity IDE',
+                desc: '次世代 AI 原生代理開發環境，提供原生 subagent 實例化、排程器與 MCP 隔離環境，為 DHF v3.0 自主運作的核心平台。'
+            },
+            'mcp': {
+                title: 'Model Context Protocol (MCP)',
+                desc: '標準化模型脈絡協定，使子代理能直接安全調用 gemini-notebook-mcp，無縫存取 60+ NotebookLM 研發庫。'
+            },
+            'llm-wiki': {
+                title: 'LLM Wiki (Andrej Karpathy)',
+                desc: '人類策展來源與提出好問題，AI 負責持續交叉比對、編纂與關聯沉澱，在 Obsidian 中實現無衰退的知識複利。'
+            },
+            'opengnt': {
+                title: 'OpenGNT 本地資料庫',
+                desc: '提供 NA28 希臘文純淨文本、RMAC 構詞代碼、Mounce 辭典與 Steven Levinsohn 篇章小句階層資料。'
+            },
+            'sefaria': {
+                title: 'Sefaria API 客戶端',
+                desc: '提供馬索拉原文（帶母音與音調）、BDB 希伯來辭典、古代他爾根亞蘭文譯本與歷代猶太拉比文獻。'
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Fade-in Intersection Observer
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.08, rootMargin: "0px 0px -40px 0px" });
+
+            document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+            // TOC Drawer Logic
+            const tocBtn = document.getElementById('toc-btn');
+            const closeTocBtn = document.getElementById('close-toc');
+            const tocDrawer = document.getElementById('toc-drawer');
+            const drawerOverlay = document.getElementById('drawer-overlay');
+            const tocLinks = tocDrawer.querySelectorAll('a');
+
+            function toggleDrawer() {
+                const isClosed = tocDrawer.classList.contains('translate-x-full');
+                if (isClosed) {
+                    tocDrawer.classList.remove('translate-x-full');
+                    drawerOverlay.classList.remove('hidden');
+                    setTimeout(() => drawerOverlay.classList.add('opacity-100'), 10);
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    tocDrawer.classList.add('translate-x-full');
+                    drawerOverlay.classList.remove('opacity-100');
+                    setTimeout(() => drawerOverlay.classList.add('hidden'), 300);
+                    document.body.style.overflow = '';
+                }
+            }
+
+            tocBtn.addEventListener('click', toggleDrawer);
+            closeTocBtn.addEventListener('click', toggleDrawer);
+            drawerOverlay.addEventListener('click', toggleDrawer);
+            
+            tocLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    toggleDrawer();
+                });
+            });
+
+            // Tooltip Logic
+            const tooltip = document.getElementById('global-tooltip');
+            const tooltipTitle = document.getElementById('tooltip-title');
+            const tooltipContent = document.getElementById('tooltip-content');
+            const triggers = document.querySelectorAll('.annotation-trigger');
+
+            let activeTrigger = null;
+
+            function positionTooltip(rect) {
+                const tooltipRect = tooltip.getBoundingClientRect();
+                const scrollY = window.scrollY;
+                const scrollX = window.scrollX;
+                
+                let top = rect.bottom + scrollY + 8;
+                let left = rect.left + scrollX;
+
+                if (left + tooltipRect.width > window.innerWidth - 20) {
+                    left = window.innerWidth - tooltipRect.width - 20;
+                }
+                
+                if (rect.bottom + tooltipRect.height + 20 > window.innerHeight) {
+                    top = rect.top + scrollY - tooltipRect.height - 8;
+                }
+
+                tooltip.style.top = `${top}px`;
+                tooltip.style.left = `${left}px`;
+            }
+
+            triggers.forEach(trigger => {
+                trigger.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const annotationKey = trigger.getAttribute('data-annotation');
+                    const data = annotations[annotationKey];
+                    
+                    if (data) {
+                        tooltipTitle.textContent = data.title;
+                        tooltipContent.textContent = data.desc;
+                        
+                        tooltip.style.visibility = 'hidden';
+                        tooltip.style.display = 'block';
+                        
+                        requestAnimationFrame(() => {
+                            positionTooltip(trigger.getBoundingClientRect());
+                            tooltip.style.display = '';
+                            tooltip.style.visibility = '';
+                            tooltip.classList.add('active');
+                            activeTrigger = trigger;
+                        });
+                    }
+                });
+            });
+
+            document.addEventListener('click', (e) => {
+                if (activeTrigger && !tooltip.contains(e.target) && e.target !== activeTrigger) {
+                    tooltip.classList.remove('active');
+                    activeTrigger = null;
+                }
+            });
+
+            document.addEventListener('scroll', () => {
+                if (activeTrigger) {
+                    tooltip.classList.remove('active');
+                    activeTrigger = null;
+                }
+            }, { passive: true });
+        });
+    </script>
+</body>
+</html>
